@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -6,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquareHeart, Send, User, Bot, Loader2 } from 'lucide-react';
+import { MessageSquareHeart, Send, User, Bot, Loader2, ArrowRight } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { generateAffirmation, GenerateAffirmationInput } from '@/ai/flows/generate-affirmation'; // Using affirmation as a proxy
-import { generateReflectionPrompt } from '@/ai/flows/generate-reflection-prompt';
+import { generateChatResponse, GenerateChatResponseInput, GenerateChatResponseOutput } from '@/ai/flows/generate-chat-response';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 
 interface Message {
@@ -18,17 +20,18 @@ interface Message {
   text: string;
   sender: 'user' | 'ai';
   timestamp: Date;
+  suggestedNavigation?: string;
 }
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [aiTone, setAiTone] = useState<string>("friendly"); // Default tone from settings or hardcoded
+  const [aiTone, setAiTone] = useState<string>("friendly");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
-  // Function to scroll to the bottom of the chat
   const scrollToBottom = () => {
     if (scrollAreaRef.current) {
         const scrollViewport = scrollAreaRef.current.querySelector('div[data-radix-scroll-area-viewport]');
@@ -43,7 +46,6 @@ export default function ChatPage() {
   }, [messages]);
 
   useEffect(() => {
-    // Load AI tone from settings if available
     const savedSettings = localStorage.getItem('neuroNestSettings');
     if (savedSettings) {
       const settings = JSON.parse(savedSettings);
@@ -51,10 +53,9 @@ export default function ChatPage() {
         setAiTone(settings.aiTone);
       }
     }
-    // Initial AI message
     setMessages([{
         id: Date.now().toString(),
-        text: "Hello! I'm your NeuroNest AI companion. How are you feeling today, or what's on your mind?",
+        text: "Hello! I'm NeuroNest, your AI companion. What's on your mind today, or is there something specific I can help you with in the app?",
         sender: 'ai',
         timestamp: new Date()
     }]);
@@ -70,36 +71,34 @@ export default function ChatPage() {
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputText;
     setInputText('');
     setIsLoading(true);
 
     try {
-      // Simple logic: if user mentions mood, use affirmation. Otherwise, use reflection prompt.
-      // This is a placeholder for a more sophisticated chat AI.
-      let aiResponseText = "";
-      if (inputText.toLowerCase().includes("feel") || inputText.toLowerCase().includes("mood")) {
-        const affirmationInput: GenerateAffirmationInput = { mood: inputText }; // Use user text as mood context
-        const affirmationOutput = await generateAffirmation(affirmationInput);
-        aiResponseText = affirmationOutput.affirmation;
-      } else if (messages.length < 3) { // For very early conversation, give a reflection prompt
-        const reflectionOutput = await generateReflectionPrompt();
-        aiResponseText = reflectionOutput.prompt;
-      } else {
-        // More generic response if no clear mood or it's not early convo
-        // The generateAffirmation flow might still give a decent generic positive response
-        const affirmationInput: GenerateAffirmationInput = { mood: "curious" }; 
-        const affirmationOutput = await generateAffirmation(affirmationInput);
-        aiResponseText = `That's interesting. ${affirmationOutput.affirmation}`;
-      }
+      const chatHistoryForFlow = messages.slice(-5).map(msg => ({ // Last 5 messages
+        sender: msg.sender,
+        text: msg.text,
+      }));
       
-      // Simulate AI "typing" delay and adaptive tone (conceptually)
-      await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+      const input: GenerateChatResponseInput = {
+        userInput: currentInput,
+        chatHistory: chatHistoryForFlow,
+        aiTone: aiTone,
+        // userLanguage: navigator.language // Basic language detection, could be improved
+      };
+
+      const output: GenerateChatResponseOutput = await generateChatResponse(input);
+      
+      // Simulate AI "typing" delay
+      await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
 
       const aiMessage: Message = {
-        id: (Date.now() + 1).toString(), // ensure unique ID
-        text: aiResponseText,
+        id: (Date.now() + 1).toString(),
+        text: output.responseText,
         sender: 'ai',
         timestamp: new Date(),
+        suggestedNavigation: output.suggestedNavigation,
       };
       setMessages(prev => [...prev, aiMessage]);
 
@@ -119,16 +118,18 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-150px)] sm:h-[calc(100vh-180px)]"> {/* Adjust height based on header */}
+    <div className="flex flex-col h-[calc(100vh-150px)] sm:h-[calc(100vh-180px)]">
       <PageHeader
         title="AI Companion Chat"
-        description={`Talk with your ${aiTone} AI. I'm here to listen and support you.`}
+        description={`Chat with NeuroNest, your ${aiTone} AI. I'm here to listen, support, and help you navigate the app.`}
         icon={MessageSquareHeart}
       />
 
       <Card className="flex-grow flex flex-col shadow-lg overflow-hidden">
         <CardHeader className="border-b">
-          <CardTitle className="text-lg">Chatting with NeuroNest AI</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Bot className="h-6 w-6 text-primary"/> Chatting with NeuroNest AI
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex-grow p-0 overflow-hidden">
           <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
@@ -152,6 +153,17 @@ export default function ChatPage() {
                     }`}
                   >
                     <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                    {msg.sender === 'ai' && msg.suggestedNavigation && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2 bg-background hover:bg-accent text-accent-foreground hover:text-accent-foreground"
+                        onClick={() => router.push(msg.suggestedNavigation!)}
+                      >
+                        Go to {msg.suggestedNavigation.startsWith('/wellness/') ? msg.suggestedNavigation.split('/')[2] : msg.suggestedNavigation.substring(1) || 'page'}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    )}
                     <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-primary-foreground/70 text-right' : 'text-muted-foreground/70 text-left'}`}>
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
@@ -192,6 +204,7 @@ export default function ChatPage() {
               disabled={isLoading}
               aria-label="Chat message input"
               suppressHydrationWarning
+              onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }}}
             />
             <Button type="submit" size="icon" disabled={isLoading || !inputText.trim()} aria-label="Send message" suppressHydrationWarning>
               {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
