@@ -113,11 +113,11 @@ export function SidebarNav() {
       </SidebarContent>
       <SidebarFooter className="p-4 mt-auto border-t border-sidebar-border">
         <div className="flex flex-col gap-2 group-data-[collapsible=icon]:items-center">
-            <Button variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-auto">
+            <Button suppressHydrationWarning variant="ghost" className="w-full justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-auto">
                 <CircleHelp className="mr-2 h-5 w-5 group-data-[collapsible=icon]:mr-0" />
                 <span className="group-data-[collapsible=icon]:hidden">Help & Support</span>
             </Button>
-            <Button variant="destructive" className="w-full justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-auto">
+            <Button suppressHydrationWarning variant="destructive" className="w-full justify-start group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-auto">
                 <ShieldAlert className="mr-2 h-5 w-5 group-data-[collapsible=icon]:mr-0" />
                 <span className="group-data-[collapsible=icon]:hidden">Emergency Mode</span>
             </Button>
