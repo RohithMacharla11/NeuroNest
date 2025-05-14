@@ -191,8 +191,9 @@ export default function ChatPage() {
               className="flex-grow focus:ring-primary focus:border-primary"
               disabled={isLoading}
               aria-label="Chat message input"
+              suppressHydrationWarning
             />
-            <Button type="submit" size="icon" disabled={isLoading || !inputText.trim()} aria-label="Send message">
+            <Button type="submit" size="icon" disabled={isLoading || !inputText.trim()} aria-label="Send message" suppressHydrationWarning>
               {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
             </Button>
           </form>

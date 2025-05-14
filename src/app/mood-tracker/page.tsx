@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -5,7 +6,7 @@ import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Smile, Frown, Meh, Laugh, Angry, Annoyed, Tired, PlusCircle, BarChartHorizontalBig, TrendingUp, TrendingDown } from 'lucide-react';
+import { Smile, Frown, Meh, Laugh, Angry, Annoyed, BatteryLow, PlusCircle, BarChartHorizontalBig, TrendingUp, TrendingDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -34,7 +35,7 @@ const moodOptions: { mood: Mood; icon: React.ElementType; label: string, color: 
   { mood: 'sad', icon: Frown, label: 'Sad', color: 'hsl(var(--chart-4))' },
   { mood: 'angry', icon: Angry, label: 'Angry', color: 'hsl(var(--chart-5))' },
   { mood: 'anxious', icon: Annoyed, label: 'Anxious', color: 'hsl(var(--accent))' },
-  { mood: 'tired', icon: Tired, label: 'Tired', color: 'hsl(var(--muted-foreground))' },
+  { mood: 'tired', icon: BatteryLow, label: 'Tired', color: 'hsl(var(--muted-foreground))' },
 ];
 
 const moodScores: Record<Mood, number> = {
@@ -179,7 +180,7 @@ export default function MoodTrackerPage() {
                 <BarChart data={chartData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis domain={[0, 5]} ticks={[1,2,3,4,5]} tickFormatter={(value) => moodOptions.find(m => moodScores[m.mood] === value)?.label || ''} tickLine={false} axisLine={false} tickMargin={8}/>
+                  <YAxis domain={[0, 5]} ticks={[1,2,3,4,5]} tickFormatter={(value) => moodOptions.find(m => moodScores[m.mood] === value)?.label.substring(0,3) || ''} tickLine={false} axisLine={false} tickMargin={8}/>
                   <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" hideLabel />} />
                   <Bar dataKey="moodScore" radius={8} />
                 </BarChart>
