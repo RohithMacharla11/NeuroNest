@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquareHeart, Send, User, Bot, Loader2, ArrowRight } from 'lucide-react';
+import { MessageSquareHeart, Send, User, Bot, Loader2, ArrowRight, Mic, MicOff } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { generateChatResponse, GenerateChatResponseInput, GenerateChatResponseOutput } from '@/ai/flows/generate-chat-response';
@@ -31,6 +31,112 @@ export default function ChatPage() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const router = useRouter();
+
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [browserSupportsSpeech, setBrowserSupportsSpeech] = useState(true);
+
+  useEffect(() => {
+    const SpeechRecognitionAPI = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      setBrowserSupportsSpeech(false);
+      toast({ title: "Voice Input Not Supported", description: "Your browser doesn't support speech recognition.", variant: "destructive" });
+      return;
+    }
+
+    const recognitionInstance = new SpeechRecognitionAPI();
+    recognitionInstance.continuous = false; // Listen for a single utterance then stop.
+    recognitionInstance.interimResults = true; // Get results as they come.
+    try {
+        recognitionInstance.lang = navigator.language || 'en-US'; // Use browser's language
+    } catch (e) {
+        console.warn("Browser language for speech recognition not fully supported, defaulting to en-US");
+        recognitionInstance.lang = 'en-US';
+    }
+    
+
+    recognitionInstance.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+      setInputText(finalTranscript || interimTranscript);
+    };
+
+    recognitionInstance.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+      let errorMsg = "Speech recognition error. Please try again.";
+      if (event.error === 'no-speech') {
+        errorMsg = "No speech was detected. Please try again.";
+      } else if (event.error === 'audio-capture') {
+        errorMsg = "Microphone problem. Ensure it's connected and enabled.";
+      } else if (event.error === 'not-allowed') {
+        errorMsg = "Permission to use microphone was denied. Please enable it in your browser settings.";
+      } else if (event.error === 'language-not-supported') {
+        errorMsg = `The language (${recognitionInstance.lang}) is not supported for speech recognition.`;
+         setBrowserSupportsSpeech(false); // Treat as not supported for this language
+      }
+      toast({ title: "Voice Error", description: errorMsg, variant: "destructive" });
+      setIsListening(false);
+    };
+
+    recognitionInstance.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognitionInstance;
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [toast]);
+
+
+  const handleToggleListening = async () => {
+    if (!recognitionRef.current) {
+      if (!browserSupportsSpeech) {
+        toast({ title: "Voice Input Not Supported", description: "Your browser doesn't support speech recognition.", variant: "destructive" });
+      } else {
+        toast({ title: "Voice Recognition Not Ready", description: "Please wait a moment and try again.", variant: "destructive" });
+      }
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      try {
+        // Ensure microphone permission by a direct request, though SpeechRecognition API handles it too.
+        // This can sometimes surface the permission prompt more reliably or catch issues early.
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // We don't need to use the stream directly here, just confirm permission.
+        // Some browsers/setups might require the stream to be explicitly stopped if not used.
+        stream.getTracks().forEach(track => track.stop());
+
+
+        recognitionRef.current.start();
+        setIsListening(true);
+        setInputText(''); // Clear input field when starting to listen
+      } catch (err: any) {
+        console.error("Error accessing microphone:", err);
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+             toast({ title: "Microphone Access Denied", description: "Please enable microphone permissions in your browser settings.", variant: "destructive" });
+        } else {
+            toast({ title: "Microphone Error", description: `Could not access microphone: ${err.message}`, variant: "destructive" });
+        }
+        setIsListening(false);
+      }
+    }
+  };
+
 
   const scrollToBottom = () => {
     if (scrollAreaRef.current) {
@@ -76,7 +182,7 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      const chatHistoryForFlow = messages.slice(-5).map(msg => ({ // Last 5 messages
+      const chatHistoryForFlow = messages.slice(-5).map(msg => ({
         sender: msg.sender,
         text: msg.text,
       }));
@@ -85,12 +191,11 @@ export default function ChatPage() {
         userInput: currentInput,
         chatHistory: chatHistoryForFlow,
         aiTone: aiTone,
-        // userLanguage: navigator.language // Basic language detection, could be improved
+        userLanguage: recognitionRef.current?.lang || navigator.language 
       };
 
       const output: GenerateChatResponseOutput = await generateChatResponse(input);
       
-      // Simulate AI "typing" delay
       await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 400));
 
       const aiMessage: Message = {
@@ -197,7 +302,7 @@ export default function ChatPage() {
           >
             <Input
               type="text"
-              placeholder="Type your message..."
+              placeholder={isListening ? "Listening..." : "Type or say something..."}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               className="flex-grow focus:ring-primary focus:border-primary"
@@ -206,6 +311,18 @@ export default function ChatPage() {
               suppressHydrationWarning
               onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }}}
             />
+            <Button 
+              type="button" 
+              size="icon" 
+              onClick={handleToggleListening} 
+              variant={isListening ? "destructive" : "outline"} 
+              disabled={isLoading || !browserSupportsSpeech} 
+              aria-label="Toggle voice input"
+              title={!browserSupportsSpeech ? "Voice input not supported by your browser" : (isListening ? "Stop listening" : "Start listening")}
+              suppressHydrationWarning
+            >
+              {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            </Button>
             <Button type="submit" size="icon" disabled={isLoading || !inputText.trim()} aria-label="Send message" suppressHydrationWarning>
               {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
             </Button>
@@ -215,3 +332,4 @@ export default function ChatPage() {
     </div>
   );
 }
+
