@@ -1,4 +1,4 @@
-// 'use server';
+'use server';
 /**
  * @fileOverview A real-time sentiment analysis AI agent for journal entries.
  *
