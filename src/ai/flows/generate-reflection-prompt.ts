@@ -41,10 +41,7 @@ const prompt = ai.definePrompt({
   - What are three things you appreciate about yourself?
   - Reflect on a moment today where you felt joy or contentment.
   - What is a goal you are working towards and what progress have you made recently?
-  - Think about a person who has had a positive impact on your life. What qualities do you appreciate about them?
-
-  Return the prompt in the following JSON format:
-  {{"prompt": "your prompt here"}}`,
+  - Think about a person who has had a positive impact on your life. What qualities do you appreciate about them?`,
 });
 
 const generateReflectionPromptFlow = ai.defineFlow(
@@ -57,3 +54,4 @@ const generateReflectionPromptFlow = ai.defineFlow(
     return output!;
   }
 );
+
